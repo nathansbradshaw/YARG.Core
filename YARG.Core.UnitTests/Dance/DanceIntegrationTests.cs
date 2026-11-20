@@ -66,7 +66,8 @@ public class DanceIntegrationTests
             new SyncTrack(480), true);
         Assert.That(engine.VisualBeat(4.1), Is.EqualTo(8).Within(.001), "Arrow motion pauses during the chart's stop");
         Assert.That(DanceNative.yarg_dance_position(0, 10), Is.EqualTo(skin.ReceptorZ));
-        Assert.That(DanceNative.yarg_dance_position(4, 10), Is.LessThan(DanceNative.yarg_dance_position(2, 10)));
+        Assert.That(skin.ReceptorZ, Is.EqualTo(-2));
+        Assert.That(DanceNative.yarg_dance_position(4, 10), Is.GreaterThan(DanceNative.yarg_dance_position(2, 10)));
         Assert.That(DanceNative.yarg_dance_color(.5), Is.EqualTo(0x59bcff));
     }
 

@@ -32,7 +32,7 @@ const MINE: [[f32; 2]; 16] = [
     [-18., -18.],
     [-7., -17.],
 ];
-pub const RECEPTOR_Z: f32 = 1.25;
+pub const RECEPTOR_Z: f32 = -2.;
 pub const SCROLL_FACTOR: f32 = 0.035;
 
 #[derive(Default, Serialize)]
@@ -73,7 +73,7 @@ pub fn color(beat: f64) -> u32 {
     0xc6d7ea
 }
 pub fn position(distance: f32, note_speed: f32) -> f32 {
-    RECEPTOR_Z - distance * note_speed * SCROLL_FACTOR
+    RECEPTOR_Z + distance * note_speed * SCROLL_FACTOR
 }
 fn cross(a: [f32; 2], b: [f32; 2], c: [f32; 2]) -> f32 {
     (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
@@ -247,11 +247,12 @@ mod tests {
         }
     }
     #[test]
-    fn arrows_flow_up_to_fixed_receptors_at_every_speed() {
+    fn arrows_flow_down_to_player_end_receptors_at_every_speed() {
         for speed in [5., 10., 20.] {
-            assert!(position(4., speed) < position(2., speed));
-            assert!(position(2., speed) < position(0., speed));
+            assert!(position(4., speed) > position(2., speed));
+            assert!(position(2., speed) > position(0., speed));
             assert_eq!(position(0., speed), RECEPTOR_Z);
+            assert_eq!(RECEPTOR_Z, -2.);
         }
     }
     #[test]
