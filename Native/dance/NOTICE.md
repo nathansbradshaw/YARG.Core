@@ -1,6 +1,8 @@
 The vendored `yace-stepmania` crate is from YACE commit
 `ea87fa3b5057097c2f81512d2f38b3127e0d8fe2` (MIT). It is included so a YARG
 checkout builds independently of a sibling YACE repository. See licenses/YACE.txt.
+The arrow outline, subdivision palette and noteskin design are adapted from
+`src/studio/dance_preview.rs` at the same YACE commit, under the same MIT license.
 Its timing implementation includes SMEditor-derived design; see
 licenses/SMEditor-MIT.txt. No StepMania artwork or executable code is bundled.
 

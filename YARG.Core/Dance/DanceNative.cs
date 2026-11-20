@@ -14,6 +14,14 @@ namespace YARG.Core.Dance
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         public static extern uint yarg_dance_abi();
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr yarg_dance_skin();
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern uint yarg_dance_color(double beat);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        public static extern float yarg_dance_position(float distance, float noteSpeed);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern double yarg_dance_beat(IntPtr session, double time);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr yarg_dance_parse(byte[] text, [MarshalAs(UnmanagedType.I1)] bool ssc, double clockOffset);
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         private static extern void yarg_dance_free_string(IntPtr text);
@@ -38,6 +46,14 @@ namespace YARG.Core.Dance
             [Out] DanceRenderNote[] notes, UIntPtr capacity);
 
         private static byte[] Utf8(string value) => Encoding.UTF8.GetBytes(value + "\0");
+
+        public static DanceSkinData ReadSkin()
+        {
+            var pointer = yarg_dance_skin();
+            if (pointer == IntPtr.Zero) throw new InvalidOperationException("Could not create YACE noteskin");
+            try { return JsonConvert.DeserializeObject<DanceSkinData>(Marshal.PtrToStringUTF8(pointer)!)!; }
+            finally { yarg_dance_free_string(pointer); }
+        }
 
         public static DanceSongData Parse(string text, bool ssc, double clockOffset = 0)
         {
@@ -66,6 +82,18 @@ namespace YARG.Core.Dance
         public int Score, Hits, Combo, MaxCombo, Misses, Drops, Mines, Holds;
         public int Total, Judgment, Sequence, NextNote;
         public double Offset;
+    }
+
+    public sealed class DanceSkinData
+    {
+        public DanceMeshData Arrow = null!, Receptor = null!, Lift = null!, Mine = null!;
+        public float[] Rotations = null!;
+        public float ReceptorZ, ScrollFactor;
+    }
+    public sealed class DanceMeshData
+    {
+        public float[][] Vertices = null!;
+        public int[] Triangles = null!;
     }
 
     [StructLayout(LayoutKind.Sequential)]
