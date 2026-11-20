@@ -420,3 +420,4 @@ FodyWeavers.xsd
 !csc.rsp
 .artifacts/
 /Native/dance/target/
+!/Native/dance/src/bin/
