@@ -31,6 +31,10 @@ namespace YARG.Core
         // 15-19: Vocals
         Vocals = 15,
 
+        // 25-29: Four-panel simfiles. Never reuse existing replay IDs.
+        Dance = 25,
+        FourKey = 26,
+
         // 20-24: Other
         // Dj = 20,
     }
@@ -71,6 +75,9 @@ namespace YARG.Core
         // 40-49: Vocals
         Vocals = 40,
         Harmony = 41,
+
+        Dance = 60,
+        FourKey = 61,
 
         // 50-59: DJ
         // DjSingle = 50,
@@ -167,6 +174,8 @@ namespace YARG.Core
         {
             return instrument switch
             {
+                Instrument.Dance => GameMode.Dance,
+                Instrument.FourKey => GameMode.FourKey,
                 Instrument.FiveFretGuitar or
                 Instrument.FiveFretBass or
                 Instrument.FiveFretRhythm or
@@ -206,6 +215,8 @@ namespace YARG.Core
         {
             return gameMode switch
             {
+                GameMode.Dance => new[] { Instrument.Dance },
+                GameMode.FourKey => new[] { Instrument.FourKey },
                 GameMode.FiveFretGuitar => new[]
                 {
                     Instrument.FiveFretGuitar,

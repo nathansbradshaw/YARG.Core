@@ -102,17 +102,23 @@ namespace YARG.Core.Song
 
             if (_chartFormat == ChartFormat.UltraStar)
             {
-                return SongChart.FromUltraStarBytes(in parseSettings, data.ReadOnlySpan);
+                return AttachDance(SongChart.FromUltraStarBytes(in parseSettings, data.ReadOnlySpan));
             }
 
             using var stream = data.ToReferenceStream();
             if (_chartFormat == ChartFormat.Mid || _chartFormat == ChartFormat.Midi)
             {
-                return SongChart.FromMidi(in parseSettings, MidFileLoader.LoadMidiFile(stream));
+                return AttachDance(SongChart.FromMidi(in parseSettings, MidFileLoader.LoadMidiFile(stream)));
             }
 
             using var reader = new StreamReader(stream);
-            return SongChart.FromDotChart(in parseSettings, reader.ReadToEnd());
+            return AttachDance(SongChart.FromDotChart(in parseSettings, reader.ReadToEnd()));
+        }
+
+        private SongChart AttachDance(SongChart chart)
+        {
+            Dance.DanceLibrary.AttachToChart(this, chart);
+            return chart;
         }
 
         public override FixedArray<byte>? LoadMiloData()

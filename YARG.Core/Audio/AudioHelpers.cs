@@ -58,6 +58,7 @@ namespace YARG.Core.Audio
         {
             return instrument switch
             {
+                Instrument.Dance or Instrument.FourKey => SongStem.Song,
                 Instrument.FiveFretGuitar or
                 Instrument.SixFretGuitar or
                 Instrument.ProGuitar_17Fret or

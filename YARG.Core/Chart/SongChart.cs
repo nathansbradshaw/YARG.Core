@@ -22,6 +22,7 @@ namespace YARG.Core.Chart
         public List<CrowdEvent> CrowdEvents { get; set; } = new();
 
         public SyncTrack SyncTrack { get; set; }
+        public Dance.DanceParts? DanceParts { get; set; }
         public VenueTrack VenueTrack { get; set; } = new();
         public LyricsTrack Lyrics { get; set; } = new();
 
@@ -316,7 +317,7 @@ namespace YARG.Core.Chart
             static double VoxMin(IEnumerable<VocalsTrack> tracks)
                 => tracks.Min((track) => track.GetStartTime());
 
-            double totalStartTime = double.MaxValue;
+            double totalStartTime = DanceParts?.Charts.Min(c => c.FirstTime) ?? double.MaxValue;
 
             // Tracks
 
@@ -349,7 +350,7 @@ namespace YARG.Core.Chart
             double VoxMax(IEnumerable<VocalsTrack> tracks)
                 => tracks.Max((track) => track.GetEndTime());
 
-            double totalEndTime = 0;
+            double totalEndTime = DanceParts?.Charts.Max(c => c.EndTime) ?? 0;
 
             // Tracks
 
@@ -386,7 +387,7 @@ namespace YARG.Core.Chart
                 tracks.Min((track) => track.GetFirstNoteStartTime());
             double VoxMin(IEnumerable<VocalsTrack> tracks) => tracks.Min((track) => track.GetFirstNoteStartTime());
 
-            double totalStartTime = double.MaxValue;
+            double totalStartTime = DanceParts?.Charts.Min(c => c.FirstTime) ?? double.MaxValue;
 
             totalStartTime = Math.Min(TrackMin(FiveFretTracks), totalStartTime);
             totalStartTime = Math.Min(TrackMin(SixFretTracks), totalStartTime);
@@ -405,7 +406,7 @@ namespace YARG.Core.Chart
             double VoxMax(IEnumerable<VocalsTrack> tracks)
                 => tracks.Max((track) => track.GetLastNoteEndTime());
 
-            double totalEndTime = 0;
+            double totalEndTime = DanceParts?.Charts.Max(c => c.EndTime) ?? 0;
 
             totalEndTime = Math.Max(TrackMax(FiveFretTracks), totalEndTime);
             totalEndTime = Math.Max(TrackMax(SixFretTracks), totalEndTime);
@@ -459,7 +460,7 @@ namespace YARG.Core.Chart
             static uint VoxMax(IEnumerable<VocalsTrack> tracks)
                 => tracks.Max((track) => track.GetLastTick());
 
-            uint totalLastTick = 0;
+            uint totalLastTick = DanceParts == null ? 0 : SyncTrack.TimeToTick(Math.Max(0, DanceParts.Charts.Max(c => c.EndTime)));
 
             // Tracks
 

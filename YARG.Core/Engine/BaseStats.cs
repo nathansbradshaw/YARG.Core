@@ -390,6 +390,12 @@ namespace YARG.Core.Engine
             return OffsetSamples;
         }
 
+        public void AddOffsetSample(double offset)
+        {
+            TotalOffset += offset;
+            OffsetSamples.Add(offset);
+        }
+
         public void IncrementNotesHit<NoteType>(NoteType note, double current_time) where NoteType : Note<NoteType>
         {
             NotesHit++;

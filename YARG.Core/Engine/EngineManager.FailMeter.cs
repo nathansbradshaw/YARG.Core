@@ -210,6 +210,11 @@ namespace YARG.Core.Engine
 
             private void SubscribeToEngineEvents()
             {
+                if (Engine is Dance.DanceEngine dance)
+                {
+                    dance.NotesHit += count => AddHappiness(count * HAPPINESS_PER_NOTE_HIT * RockMeterPreset.HitRecoveryMultiplier);
+                    dance.NotesMissed += count => AddHappiness(-count * HAPPINESS_PER_NOTE_MISS * RockMeterPreset.MissDamageMultiplier);
+                }
                 // Subscribe to OnNoteHit and OnNoteMissed events
                 if (Engine is BaseEngine<GuitarNote,GuitarEngineParameters,GuitarStats> guitarEngine)
                 {

@@ -220,6 +220,8 @@ namespace YARG.Core.Replays.Analyzer
                     StatLog = log,
                 });
             }
+            foreach (var engine in engines)
+                if (engine is IDisposable disposable) disposable.Dispose();
             return results;
         }
 
@@ -227,6 +229,12 @@ namespace YARG.Core.Replays.Analyzer
         {
             switch (profile.GameMode)
             {
+                case GameMode.Dance:
+                case GameMode.FourKey:
+                    return new Dance.DanceEngine(
+                        _chart.DanceParts?.GetChart(profile.CurrentInstrument, profile.CurrentDifficulty)
+                            ?? throw new InvalidOperationException("Replay simfiles are missing; rescan songs"),
+                        _chart.SyncTrack, profile.IsBot, (KeysEngineParameters)parameters);
                 case GameMode.FiveFretGuitar:
                 {
                     // Reset the notes

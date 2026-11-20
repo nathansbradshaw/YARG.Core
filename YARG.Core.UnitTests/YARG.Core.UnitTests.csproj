@@ -27,4 +27,10 @@
     <ProjectReference Include="..\YARG.Core\YARG.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="../Native/dance/target/release/libyarg_dance.dylib" Condition="Exists('../Native/dance/target/release/libyarg_dance.dylib')" CopyToOutputDirectory="PreserveNewest" Link="libyarg_dance.dylib" />
+    <None Include="../Native/dance/target/release/libyarg_dance.so" Condition="Exists('../Native/dance/target/release/libyarg_dance.so')" CopyToOutputDirectory="PreserveNewest" Link="libyarg_dance.so" />
+    <None Include="../Native/dance/target/release/yarg_dance.dll" Condition="Exists('../Native/dance/target/release/yarg_dance.dll')" CopyToOutputDirectory="PreserveNewest" Link="yarg_dance.dll" />
+  </ItemGroup>
+
 </Project>

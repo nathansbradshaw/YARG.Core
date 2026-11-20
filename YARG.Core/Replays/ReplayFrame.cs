@@ -57,8 +57,12 @@ namespace YARG.Core.Replays
                     Stats = new VocalsStats(ref stream, version);
                     break;
                 case GameMode.ProKeys:
+                case GameMode.Dance:
+                case GameMode.FourKey:
                     EngineParameters = new KeysEngineParameters(ref stream, version);
-                    Stats = new KeysStats(ref stream, version);
+                    Stats = Profile.GameMode is GameMode.Dance or GameMode.FourKey
+                        ? new Dance.DanceStats(ref stream, version)
+                        : new KeysStats(ref stream, version);
                     break;
                 default:
                     throw new InvalidOperationException("Stat creation not implemented.");

@@ -65,14 +65,14 @@ namespace YARG.Core.Song
         protected const string YARGROUND_FULLNAME = "bg.yarground";
         protected static readonly Random BACKROUND_RNG = new();
 
-        private SortString _name = SortString.Empty;
-        private SortString _artist = SortString.Empty;
-        private SortString _album = SortString.Empty;
+        protected SortString _name = SortString.Empty;
+        protected SortString _artist = SortString.Empty;
+        protected SortString _album = SortString.Empty;
         private SortString _rawGenre = SortString.Empty;
         private SortString _rawSubgenre = SortString.Empty;
         private SortString _charter = SortString.Empty;
-        private SortString _source = SortString.Empty;
-        private SortString _playlist = SortString.Empty;
+        protected SortString _source = SortString.Empty;
+        protected SortString _playlist = SortString.Empty;
         private bool _isDuplicate = false;
 
         protected SongMetadata _metadata = SongMetadata.Default;
@@ -87,6 +87,12 @@ namespace YARG.Core.Song
         public abstract string ActualLocation { get; }
 
         public HashWrapper Hash => _hash;
+        // Reattached after the ordinary cache scan, so adding/editing a simfile
+        // does not depend on the band chart's cached modification time.
+        public Dance.DanceParts? DanceParts { get; internal set; }
+        internal HashWrapper? DanceBandHash { get; set; }
+
+        internal void SetDanceHash(HashWrapper hash) => _hash = hash;
         public SortString Name => _name;
         public SortString Artist => _artist;
         public SortString Album => _album;
@@ -214,6 +220,7 @@ namespace YARG.Core.Song
             {
                 return instrument switch
                 {
+                    Instrument.Dance or Instrument.FourKey => DanceParts?.GetPart(instrument) ?? PartValues.Default,
                     Instrument.FiveFretGuitar => _parts.FiveFretGuitar,
                     Instrument.FiveFretBass => _parts.FiveFretBass,
                     Instrument.FiveFretRhythm => _parts.FiveFretRhythm,
@@ -253,6 +260,7 @@ namespace YARG.Core.Song
         {
             return instrument switch
             {
+                Instrument.Dance or Instrument.FourKey => this[instrument].IsActive(),
                 Instrument.FiveFretGuitar => _parts.FiveFretGuitar.IsActive(),
                 Instrument.FiveFretBass => _parts.FiveFretBass.IsActive(),
                 Instrument.FiveFretRhythm => _parts.FiveFretRhythm.IsActive(),
@@ -295,6 +303,7 @@ namespace YARG.Core.Song
         {
             PartValues? part = instrument switch
             {
+                Instrument.Dance or Instrument.FourKey => this[instrument],
                 Instrument.FiveFretGuitar     => _parts.FiveFretGuitar,
                 Instrument.FiveFretBass       => _parts.FiveFretBass,
                 Instrument.FiveFretRhythm     => _parts.FiveFretRhythm,
