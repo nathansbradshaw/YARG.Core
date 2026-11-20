@@ -53,6 +53,77 @@ public class DanceIntegrationTests
     private static SongEntry Only(SongCache cache) => cache.Entries.Values.SelectMany(e => e).Single();
 
     [Test]
+    public void DanceScoresMatchGuitarForTheSameUnpoweredSingleNotes()
+    {
+        var chart = Only(Scan()).LoadChart()!;
+        var source = chart.FiveFretGuitar.GetDifficulty(Difficulty.Expert).Clone();
+        var thresholds = new[] { .06f, .12f, .20f, .47f, .78f, 1.15f };
+        var guitar = new YargFiveFretGuitarEngine(source, chart.SyncTrack,
+            EnginePreset.Default.FiveFretGuitar.Create(thresholds, new float[6], false), true);
+        var notes = new DanceChart { Timing = chart.DanceParts!.GetChart(Instrument.Dance, Difficulty.Expert).Timing, Notes = source.Notes.Select((n, i) => new DanceNote {
+            Lane = (byte)(i % 4), Beat = n.Tick / (double)chart.Resolution, EndBeat = n.Tick / (double)chart.Resolution,
+            Time = n.Time, EndTime = n.Time, Kind = "tap", Judgable = true }).ToArray() };
+        using var dance = new DanceEngine(notes, chart.SyncTrack, true);
+        guitar.AllowStarPower(false); dance.AllowStarPower(false);
+        guitar.Update(14); dance.Update(14);
+        Assert.That(dance.Stats.TotalScore, Is.EqualTo(guitar.BaseStats.TotalScore));
+        Assert.That(dance.Stats.NoteScore, Is.EqualTo(guitar.BaseStats.NoteScore));
+        Assert.That(dance.Stats.ScoreMultiplier, Is.EqualTo(guitar.BaseStats.ScoreMultiplier));
+        Assert.That(dance.BaseScore, Is.EqualTo(guitar.BaseScore));
+        Assert.That(dance.BaseNoteScore, Is.EqualTo(guitar.BaseNoteScore));
+        Assert.That(dance.Stats.StarPowerPhrasesHit, Is.Zero);
+        Assert.That(Marshal.SizeOf<DanceScoreState>(), Is.EqualTo(88));
+    }
+
+    [Test]
+    public void ManualStarPowerEarnsDoublesDrainsAndSurvivesReplaySeeking()
+    {
+        var chart = Only(Scan()).LoadChart()!;
+        var notes = chart.DanceParts!.GetChart(Instrument.FourKey, Difficulty.Expert);
+        Assert.That(notes.PowerPhrases.Length, Is.EqualTo(2));
+        using var engine = new DanceEngine(notes, chart.SyncTrack, false);
+        var inputs = new List<GameInput>();
+        foreach (var note in notes.Notes.Where(n => n.Judgable && n.Kind != "mine"))
+        {
+            inputs.Add(new GameInput(note.Time, note.Lane, true));
+            inputs.Add(new GameInput(Math.Max(note.Time + .01, note.EndTime), note.Lane, false));
+        }
+        inputs.Add(new GameInput(8.1, (int)DanceAction.StarPower, true));
+        inputs.Add(new GameInput(8.2, (int)DanceAction.StarPower, false));
+        var ordered = inputs.OrderBy(i => i.Time).ToArray();
+        engine.ProcessUpToTime(25, ordered);
+        Assert.That(engine.Stats.StarPowerPhrasesHit, Is.EqualTo(2));
+        Assert.That(engine.Stats.StarPowerActivationCount, Is.EqualTo(1));
+        Assert.That(engine.Stats.StarPowerScore, Is.GreaterThan(0));
+        Assert.That(engine.Stats.TimeInStarPower, Is.EqualTo(8).Within(.01));
+        Assert.That(engine.GetStarPowerBarAmount(), Is.Zero);
+        int score = engine.Stats.TotalScore;
+        engine.ProcessUpToTime(6, ordered);
+        Assert.That(engine.Stats.StarPowerActivationCount, Is.Zero);
+        engine.ProcessUpToTime(25, ordered);
+        Assert.That(engine.Stats.TotalScore, Is.EqualTo(score));
+        Assert.That(engine.Stats.TotalScore, Is.EqualTo(engine.Stats.NoteScore + engine.Stats.SustainScore + engine.Stats.MultiplierScore + engine.Stats.StarPowerScore));
+    }
+
+    [Test]
+    public void BothDanceModesDriveTheSharedBandMultiplier()
+    {
+        var chart = Only(Scan()).LoadChart()!;
+        using var dance = new DanceEngine(chart.DanceParts!.GetChart(Instrument.Dance, Difficulty.Expert), chart.SyncTrack, true);
+        using var keys = new DanceEngine(chart.DanceParts.GetChart(Instrument.FourKey, Difficulty.Expert), chart.SyncTrack, true);
+        var manager = new EngineManager();
+        manager.Register(dance, Instrument.Dance, chart, RockMeterPreset.Normal);
+        manager.Register(keys, Instrument.FourKey, chart, RockMeterPreset.Normal);
+        for (int i = 0; i <= 12 * 120; i++) manager.UpdateEngines(i / 120.0);
+        Assert.That(manager.BandMultiplier, Is.EqualTo(4));
+        Assert.That(dance.Stats.StarPowerActivationCount, Is.EqualTo(1));
+        Assert.That(keys.Stats.StarPowerActivationCount, Is.EqualTo(1));
+        Assert.That(dance.Stats.BandBonusScore, Is.GreaterThan(0));
+        Assert.That(keys.Stats.BandBonusScore, Is.GreaterThan(0));
+        Assert.That(dance.Stats.TotalScore, Is.EqualTo(dance.Stats.NoteScore + dance.Stats.SustainScore + dance.Stats.MultiplierScore + dance.Stats.StarPowerScore));
+    }
+
+    [Test]
     public void YaceNoteskinCrossesNativeBoundaryAndUsesChartBeatForMotion()
     {
         var skin = DanceNative.ReadSkin();
@@ -180,9 +251,12 @@ public class DanceIntegrationTests
             inputs.Add(new GameInput(note.Time, note.Lane, true));
             inputs.Add(new GameInput(Math.Max(note.Time + .001, note.EndTime), note.Lane, false));
         }
+        inputs.Add(new GameInput(8.1, (int)DanceAction.StarPower, true));
+        inputs.Add(new GameInput(8.2, (int)DanceAction.StarPower, false));
         var ordered = inputs.OrderBy(i => i.Time).ToArray();
         foreach (var original in ordered) { var input = original; engine.QueueInput(ref input); }
         engine.Update(15);
+        Assert.That(engine.Stats.StarPowerActivationCount, Is.EqualTo(1));
         var expected = engine.Stats.TotalScore;
         var profile = new YargProfile { Name = "Dance roundtrip", GameMode = mode, CurrentInstrument = instrument, CurrentDifficulty = Difficulty.Expert };
         var frame = new ReplayFrame(profile, engine.Parameters, new DanceStats(engine.Stats), ordered);

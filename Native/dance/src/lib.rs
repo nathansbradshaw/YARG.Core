@@ -8,6 +8,7 @@ use yace_stepmania::{
     Document, Format, NoteKind, Timing, TimingKind,
     timing::{AudioPosition, Boundary},
 };
+pub mod scoring;
 pub mod skin;
 
 pub const WINDOW: f64 = 0.180;
@@ -193,6 +194,8 @@ pub struct Session {
     active: Vec<usize>,
     display: Vec<(f64, f64)>,
     snapshot: Snapshot,
+    scoring: scoring::Ledger,
+    hit_rows: std::collections::HashSet<i64>,
 }
 
 impl Session {
@@ -251,6 +254,7 @@ impl Session {
                 )
             })
             .collect();
+        let scoring = scoring::Ledger::new(&chart.notes, bot, start, end);
         Ok(Self {
             chart,
             states,
@@ -269,6 +273,8 @@ impl Session {
                 total,
                 ..Default::default()
             },
+            scoring,
+            hit_rows: std::collections::HashSet::new(),
         })
     }
 
@@ -292,10 +298,12 @@ impl Session {
         } else {
             5
         };
-        self.snapshot.score += [0, 1000, 950, 800, 500, 200][judgment as usize];
         self.snapshot.hits += 1;
-        self.snapshot.combo += 1;
+        if self.hit_rows.insert((n.beat * 48.).round() as i64) {
+            self.snapshot.combo += 1;
+        }
         self.snapshot.max_combo = self.snapshot.max_combo.max(self.snapshot.combo);
+        self.scoring.hit(i, n, time, self.snapshot.combo, self.end);
         self.states[i] = if sustained { 3 } else { 1 };
         if sustained {
             self.released[n.lane as usize] = time;
@@ -307,13 +315,14 @@ impl Session {
         self.states[i] = 2;
         self.snapshot.misses += 1;
         self.snapshot.combo = 0;
+        self.scoring.fail(i, self.time);
         self.feedback(6, 0.);
     }
     fn mine(&mut self, i: usize) {
         self.states[i] = 6;
         self.snapshot.mines += 1;
         self.snapshot.combo = 0;
-        self.snapshot.score = (self.snapshot.score - 1000).max(0);
+        self.scoring.fail(i, self.time);
         self.feedback(9, 0.);
     }
     pub fn update(&mut self, time: f64) -> Result<Snapshot> {
@@ -324,6 +333,20 @@ impl Session {
         let old = self.time;
         self.time = time;
         let window = WINDOW * self.speed;
+        for &i in &self.active {
+            let n = &self.chart.notes[i];
+            let lane = n.lane as usize;
+            let limit = if self.bot {
+                f64::INFINITY
+            } else if n.kind == NoteKind::Roll {
+                self.last_press[lane] + ROLL_GAP * self.speed
+            } else if self.held[lane] {
+                f64::INFINITY
+            } else {
+                self.released[lane] + HOLD_GRACE * self.speed
+            };
+            self.scoring.limit_hold(i, limit);
+        }
         let mut i = self.cursor;
         while i < self.chart.notes.len() {
             let n = &self.chart.notes[i];
@@ -366,11 +389,11 @@ impl Session {
                 self.states[i] = 5;
                 self.snapshot.drops += 1;
                 self.snapshot.combo = 0;
+                self.scoring.fail(i, drop_time);
                 self.feedback(8, 0.);
             } else if time >= n.end_time.min(self.end) {
                 self.states[i] = 4;
                 self.snapshot.holds += 1;
-                self.snapshot.score += 250;
                 self.feedback(7, 0.);
             } else {
                 self.active.push(i);
@@ -380,6 +403,8 @@ impl Session {
             self.cursor += 1;
         }
         self.snapshot.next_note = self.cursor as i32;
+        self.scoring.advance(time);
+        self.snapshot.score = self.scoring.score();
         Ok(self.snapshot)
     }
     pub fn input(&mut self, time: f64, lane: usize, pressed: bool) -> Result<Snapshot> {
@@ -646,7 +671,12 @@ pub unsafe extern "C" fn yarg_dance_update(
     }
     catch_unwind(AssertUnwindSafe(|| {
         let session = unsafe { &mut *ptr };
-        let result = if lane < 0 {
+        let result = if lane == 4 {
+            session.update(time).map(|_| {
+                session.scoring.power_input(time, pressed);
+                session.snapshot
+            })
+        } else if lane < 0 {
             session.update(time)
         } else {
             session.input(time, lane as usize, pressed)
@@ -712,4 +742,54 @@ pub unsafe extern "C" fn yarg_dance_render(
 }
 
 #[cfg(test)]
+mod scoring_tests;
+#[cfg(test)]
 mod tests;
+
+#[unsafe(no_mangle)]
+/// # Safety
+/// `ptr` must be a live exclusively accessed session and `json` readable UTF-8.
+pub unsafe extern "C" fn yarg_dance_configure_score(
+    ptr: *mut Session,
+    json: *const c_char,
+) -> bool {
+    if ptr.is_null() {
+        return false;
+    }
+    catch_unwind(AssertUnwindSafe(|| -> Result<()> {
+        let config = serde_json::from_str(unsafe { utf8(json)? })?;
+        let s = unsafe { &mut *ptr };
+        s.scoring.configure(config, &s.chart.notes, s.start, s.end)
+    }))
+    .is_ok_and(|r| r.is_ok())
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// `ptr` must be null or a live session; output must be null or aligned writable
+/// storage for one ScoreState, without concurrent access.
+pub unsafe extern "C" fn yarg_dance_score(
+    ptr: *const Session,
+    output: *mut scoring::ScoreState,
+) -> bool {
+    if ptr.is_null() || output.is_null() {
+        return false;
+    }
+    unsafe {
+        *output = (&*ptr).scoring.state();
+    }
+    true
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// `ptr` must be null or a live exclusively accessed session.
+pub unsafe extern "C" fn yarg_dance_score_context(ptr: *mut Session, band: i32, allowed: bool) {
+    if let Some(s) = unsafe { ptr.as_mut() } {
+        s.scoring.context(band, allowed);
+    }
+}
+#[unsafe(no_mangle)]
+/// # Safety
+/// `ptr` must be null or a live session that is not concurrently mutated.
+pub unsafe extern "C" fn yarg_dance_power_note(ptr: *const Session, index: usize) -> bool {
+    unsafe { ptr.as_ref() }.is_some_and(|s| s.scoring.is_phrase(index))
+}

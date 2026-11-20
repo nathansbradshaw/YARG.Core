@@ -27,6 +27,7 @@ namespace YARG.Core.Dance
         [JsonProperty("meter")] public int Meter;
         [JsonProperty("timing")] public JObject Timing = new();
         [JsonProperty("notes")] public DanceNote[] Notes = Array.Empty<DanceNote>();
+        [JsonIgnore] public DancePowerPhrase[] PowerPhrases = Array.Empty<DancePowerPhrase>();
         [JsonIgnore] public int TotalNotes => Notes.Count(n => n.Judgable && n.Kind != "mine");
         [JsonIgnore] public double FirstTime => Notes.Length == 0 ? 0 : Notes.Min(n => n.Time);
         [JsonIgnore] public double EndTime => Notes.Length == 0 ? 0 : Notes.Max(n => n.EndTime);
