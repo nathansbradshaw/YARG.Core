@@ -8,6 +8,7 @@ use yace_stepmania::{
     Document, Format, NoteKind, Timing, TimingKind,
     timing::{AudioPosition, Boundary},
 };
+pub mod skin;
 
 pub const WINDOW: f64 = 0.180;
 const HOLD_GRACE: f64 = 0.250;
@@ -434,14 +435,17 @@ impl Session {
         self.chart.timing.display_at(n.beat, beat, time, false)
     }
 
-    pub fn render(&self, time: f64, min: f64, max: f64, output: &mut [RenderNote]) -> usize {
-        let timing = &self.chart.timing;
-        let beat = match timing.position(time) {
+    pub fn beat(&self, time: f64) -> f64 {
+        match self.chart.timing.position(time) {
             AudioPosition::Beat(b)
             | AudioPosition::Delay { beat: b }
             | AudioPosition::Stop { beat: b } => b,
             AudioPosition::Warp { to, .. } => to,
-        };
+        }
+    }
+    pub fn render(&self, time: f64, min: f64, max: f64, output: &mut [RenderNote]) -> usize {
+        let timing = &self.chart.timing;
+        let beat = self.beat(time);
         let origin = integral(timing, beat);
         let mut speeds: Vec<_> = timing
             .events
@@ -528,6 +532,34 @@ unsafe fn utf8<'a>(ptr: *const c_char) -> Result<&'a str> {
 #[unsafe(no_mangle)]
 pub extern "C" fn yarg_dance_abi() -> u32 {
     1
+}
+
+/// Owned UTF-8 noteskin mesh data; release with `yarg_dance_free_string`.
+#[unsafe(no_mangle)]
+pub extern "C" fn yarg_dance_skin() -> *mut c_char {
+    catch_unwind(|| {
+        CString::new(serde_json::to_string(&skin::create()).unwrap())
+            .unwrap()
+            .into_raw()
+    })
+    .unwrap_or(std::ptr::null_mut())
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn yarg_dance_color(beat: f64) -> u32 {
+    skin::color(beat)
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn yarg_dance_position(distance: f32, note_speed: f32) -> f32 {
+    skin::position(distance, note_speed)
+}
+/// # Safety
+/// `ptr` must be null or a live session, exclusively owned by the calling thread.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn yarg_dance_beat(ptr: *const Session, time: f64) -> f64 {
+    if ptr.is_null() || !time.is_finite() {
+        return 0.;
+    }
+    unsafe { &*ptr }.beat(time)
 }
 #[unsafe(no_mangle)]
 /// # Safety

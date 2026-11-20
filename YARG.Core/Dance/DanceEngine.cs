@@ -46,6 +46,7 @@ namespace YARG.Core.Dance
         }
 
         public byte State(int index) => DanceNative.yarg_dance_state(_session, (UIntPtr)(uint)index);
+        public double VisualBeat(double time) => DanceNative.yarg_dance_beat(_session, time);
         public double Distance(int index, double time) => DanceNative.yarg_dance_distance(_session, (UIntPtr)(uint)index, time);
         public int Render(double time, double min, double max, DanceRenderNote[] buffer) =>
             (int)DanceNative.yarg_dance_render(_session, time, min, max, buffer, (UIntPtr)(uint)buffer.Length);

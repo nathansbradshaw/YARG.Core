@@ -53,6 +53,24 @@ public class DanceIntegrationTests
     private static SongEntry Only(SongCache cache) => cache.Entries.Values.SelectMany(e => e).Single();
 
     [Test]
+    public void YaceNoteskinCrossesNativeBoundaryAndUsesChartBeatForMotion()
+    {
+        var skin = DanceNative.ReadSkin();
+        Assert.That(skin.Rotations, Is.EqualTo(new[] { -90f, 180f, 0f, 90f }));
+        foreach (var mesh in new[] { skin.Arrow, skin.Receptor, skin.Lift, skin.Mine })
+        {
+            Assert.That(mesh.Vertices.All(v => v.Length == 8), Is.True);
+            Assert.That(mesh.Triangles.All(i => i >= 0 && i < mesh.Vertices.Length), Is.True);
+        }
+        using var engine = new DanceEngine(Only(Scan()).LoadChart()!.DanceParts!.GetChart(Instrument.Dance, Difficulty.Expert),
+            new SyncTrack(480), true);
+        Assert.That(engine.VisualBeat(4.1), Is.EqualTo(8).Within(.001), "Arrow motion pauses during the chart's stop");
+        Assert.That(DanceNative.yarg_dance_position(0, 10), Is.EqualTo(skin.ReceptorZ));
+        Assert.That(DanceNative.yarg_dance_position(4, 10), Is.LessThan(DanceNative.yarg_dance_position(2, 10)));
+        Assert.That(DanceNative.yarg_dance_color(.5), Is.EqualTo(0x59bcff));
+    }
+
+    [Test]
     public void AllFivePartsAreOneLibrarySongAndKeepIndependentTiming()
     {
         var song = Only(Scan());
