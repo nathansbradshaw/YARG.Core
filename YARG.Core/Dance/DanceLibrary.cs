@@ -117,6 +117,9 @@ namespace YARG.Core.Dance
         internal static HashWrapper CombinedHash(DanceParts parts, byte[]? bandHash = null, double clockOffset = 0)
         {
             using var content = new MemoryStream();
+            // Keep old 1,000-point Dance scores/replays in their original ruleset.
+            var rules = Encoding.UTF8.GetBytes("YARG-Dance-Scoring-2\0");
+            content.Write(rules, 0, rules.Length);
             if (bandHash != null) content.Write(bandHash, 0, bandHash.Length);
             var offset = BitConverter.GetBytes(clockOffset);
             content.Write(offset, 0, offset.Length);
@@ -133,10 +136,27 @@ namespace YARG.Core.Dance
         {
             entry.DanceParts?.ValidateSources();
             var parts = entry.DanceParts;
-            if (parts == null || entry.SongOffsetSeconds == 0) { chart.DanceParts = parts; return; }
+            if (parts == null) { chart.DanceParts = null; return; }
+            if (entry.SongOffsetSeconds == 0) chart.DanceParts = parts;
+            else
+            {
             DanceSongData? Shift(DanceSongData? song) => song == null ? null :
                 DanceNative.Parse(song.SourceText, Path.GetExtension(song.Source).Equals(".ssc", StringComparison.OrdinalIgnoreCase), entry.SongOffsetSeconds);
             chart.DanceParts = new DanceParts { Pad = Shift(parts.Pad), Keyboard = Shift(parts.Keyboard) };
+            }
+            foreach (var dance in chart.DanceParts.Charts)
+            {
+                // Prefer the authored guitar phrases, then another band part.
+                // Rust supplies deterministic phrases when the band has none.
+                var phrases = chart.FiveFretTracks.Select(t => t.TryGetDifficulty(dance.Difficulty, out var d) ? d.Phrases : null)
+                    .Where(p => p != null).Select(p => p!.Where(v => v.Type == PhraseType.StarPower).ToArray())
+                    .FirstOrDefault(p => p.Length > 0);
+                phrases ??= chart.DrumsTracks.Select(t => t.TryGetDifficulty(dance.Difficulty, out var d) ? d.Phrases : null)
+                    .Where(p => p != null).Select(p => p!.Where(v => v.Type == PhraseType.StarPower).ToArray())
+                    .FirstOrDefault(p => p.Length > 0);
+                dance.PowerPhrases = phrases?.Select(p => new DancePowerPhrase { Start = p.Time, End = p.TimeEnd }).ToArray()
+                    ?? Array.Empty<DancePowerPhrase>();
+            }
         }
     }
 }

@@ -212,6 +212,7 @@ namespace YARG.Core.Engine
             {
                 if (Engine is Dance.DanceEngine dance)
                 {
+                    dance.OnStarPowerStatus += OnStarPowerStatus;
                     dance.NotesHit += count => AddHappiness(count * HAPPINESS_PER_NOTE_HIT * RockMeterPreset.HitRecoveryMultiplier);
                     dance.NotesMissed += count => AddHappiness(-count * HAPPINESS_PER_NOTE_MISS * RockMeterPreset.MissDamageMultiplier);
                 }

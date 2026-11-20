@@ -70,6 +70,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         note(&mut guitar, beat * 480, 120, 96 + (beat % 4) as u8);
         note(&mut drums, beat * 480, 120, 97 + (beat % 3) as u8);
     }
+    // Authored band SP windows also drive the attached YACE dance parts.
+    for beat in [4, 12] {
+        note(&mut guitar, beat * 480, 4 * 480, 116);
+        note(&mut drums, beat * 480, 4 * 480, 116);
+    }
     for phrase in [4, 12, 20] {
         note(&mut vocals, phrase * 480, 1440, 105);
         for beat in phrase..phrase + 3 {

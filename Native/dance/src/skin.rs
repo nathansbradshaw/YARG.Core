@@ -108,6 +108,38 @@ fn triangulate(points: &[[f32; 2]]) -> Vec<u32> {
     result
 }
 impl Mesh {
+    // Physical sidewalls and a sloped metal rim; baked directional shading keeps
+    // the silhouette readable under YARG's unlit highway rendering.
+    fn body(&mut self, points: &[[f32; 2]], scale: f32, height: f32) {
+        for i in 0..points.len() {
+            let a = points[i];
+            let b = points[(i + 1) % points.len()];
+            let dx = b[0] - a[0];
+            let dy = b[1] - a[1];
+            let light = (0.65 + (dx - dy) / dx.hypot(dy) * 0.25).clamp(0.25, 1.);
+            for (bottom_scale, top_scale, bottom_y, top_y, brightness) in [
+                (scale, scale, 0.012, height - 0.025, light * 0.3),
+                (scale, scale * 0.85, height - 0.025, height, light),
+            ] {
+                let base = self.vertices.len() as u32;
+                for (p, size, y) in [
+                    (a, bottom_scale, bottom_y),
+                    (b, bottom_scale, bottom_y),
+                    (a, top_scale, top_y),
+                    (b, top_scale, top_y),
+                ] {
+                    self.vertex(p, size, 0., 0xbad1e2, 1., 0.2);
+                    let v = self.vertices.last_mut().unwrap();
+                    v[1] = y;
+                    for channel in &mut v[3..6] {
+                        *channel *= brightness;
+                    }
+                }
+                self.triangles
+                    .extend([base, base + 1, base + 2, base + 2, base + 1, base + 3]);
+            }
+        }
+    }
     fn vertex(&mut self, p: [f32; 2], scale: f32, layer: f32, rgb: u32, alpha: f32, tint: f32) {
         self.vertices.push([
             p[0] / 160. * scale,
@@ -185,8 +217,6 @@ fn circle(radius: f32) -> Vec<[f32; 2]> {
 }
 pub fn create() -> Skin {
     let mut arrow = Mesh::default();
-    arrow.fill(&ARROW, 1., 0., 0x03080d, 1., 0.);
-    arrow.fill(&ARROW, 0.95, 1., 0x9bb8d0, 1., 0.);
     arrow.fill(&ARROW, 0.85, 2., 0xffffff, 1., 1.);
     // The same light-to-dark sheen as YACE, expressed as vertex colors.
     let start = arrow.vertices.len();
@@ -200,15 +230,27 @@ pub fn create() -> Skin {
     arrow.line([-21., -1.], [0., -22.], 2., 4., 0xffffff, 0.6);
     arrow.line([0., -22.], [21., -1.], 2., 4., 0xffffff, 0.6);
     arrow.line([-6., 4.], [-6., 21.], 2., 4., 0xffffff, 0.6);
+    for v in &mut arrow.vertices {
+        v[1] += 0.075;
+    }
+    arrow.body(&ARROW, 1., 0.09);
     let mut lift = Mesh::default();
-    lift.fill(&ARROW, 1., 0., 0x0b111a, 1., 0.);
-    lift.ring(&ARROW, (1., 0.88), 1., 0xffffff, 1., 1.);
-    lift.ring(&ARROW, (0.77, 0.74), 2., 0xffffff, 0.5, 1.);
+    lift.fill(&ARROW, 0.85, 0., 0x0b111a, 1., 0.);
+    lift.ring(&ARROW, (0.85, 0.74), 1., 0xffffff, 1., 1.);
+    lift.ring(&ARROW, (0.65, 0.62), 2., 0xffffff, 0.5, 1.);
+    for v in &mut lift.vertices {
+        v[1] += 0.075;
+    }
+    lift.body(&ARROW, 1., 0.09);
     let mut receptor = Mesh::default();
-    receptor.fill(&ARROW, 1.12, 0., 0x0b111a, 1., 0.);
-    receptor.ring(&ARROW, (1.12, 1.02), 1., 0x54677b, 1., 0.);
+    receptor.fill(&ARROW, 0.952, 0., 0x0b111a, 1., 0.);
+    receptor.ring(&ARROW, (0.952, 0.87), 1., 0x54677b, 1., 0.);
     receptor.fill(&ARROW, 0.79, 2., 0xffffff, 1., 1.);
     receptor.ring(&ARROW, (0.79, 0.72), 3., 0xd6e7f5, 0.6, 0.);
+    for v in &mut receptor.vertices {
+        v[1] += 0.025;
+    }
+    receptor.body(&ARROW, 1.12, 0.04);
     let mut mine = Mesh::default();
     mine.fill(&MINE, 1., 0., 0xff7d8e, 1., 0.);
     mine.fill(&MINE, 0.9, 1., 0x3a202d, 1., 0.);
@@ -230,6 +272,31 @@ pub fn create() -> Skin {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn arrows_have_raised_faces_and_connected_beveled_sidewalls() {
+        let skin = create();
+        for mesh in [&skin.arrow, &skin.lift] {
+            let min = mesh
+                .vertices
+                .iter()
+                .map(|v| v[1])
+                .fold(f32::INFINITY, f32::min);
+            let max = mesh
+                .vertices
+                .iter()
+                .map(|v| v[1])
+                .fold(f32::NEG_INFINITY, f32::max);
+            assert!(max - min > 0.07);
+            assert!(mesh.triangles.chunks(3).any(|t| {
+                let [a, b, c] = [
+                    mesh.vertices[t[0] as usize],
+                    mesh.vertices[t[1] as usize],
+                    mesh.vertices[t[2] as usize],
+                ];
+                (a[1] - b[1]).abs() + (a[1] - c[1]).abs() > 0.02
+            }));
+        }
+    }
     #[test]
     fn exact_yace_subdivision_palette() {
         for (row, expected) in [

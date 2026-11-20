@@ -22,6 +22,17 @@ namespace YARG.Core.Dance
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         internal static extern double yarg_dance_beat(IntPtr session, double time);
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        internal static extern bool yarg_dance_score(IntPtr session, out DanceScoreState score);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        private static extern bool yarg_dance_configure_score(IntPtr session, byte[] config);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void yarg_dance_score_context(IntPtr session, int band, [MarshalAs(UnmanagedType.I1)] bool allowed);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        internal static extern bool yarg_dance_power_note(IntPtr session, UIntPtr index);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr yarg_dance_parse(byte[] text, [MarshalAs(UnmanagedType.I1)] bool ssc, double clockOffset);
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
         private static extern void yarg_dance_free_string(IntPtr text);
@@ -74,6 +85,11 @@ namespace YARG.Core.Dance
             if (handle == IntPtr.Zero) throw new InvalidOperationException("Could not create Dance engine");
             return handle;
         }
+        internal static void ConfigureScore(IntPtr handle, object config)
+        {
+            if (!yarg_dance_configure_score(handle, Utf8(JsonConvert.SerializeObject(config))))
+                throw new InvalidOperationException("Invalid Dance scoring configuration");
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -82,6 +98,13 @@ namespace YARG.Core.Dance
         public int Score, Hits, Combo, MaxCombo, Misses, Drops, Mines, Holds;
         public int Total, Judgment, Sequence, NextNote;
         public double Offset;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DanceScoreState
+    {
+        public int Note, Sustain, Multiplier, StarPowerScore, BandBonus, ScoreMultiplier,
+            PhrasesHit, TotalPhrases, Activations, Active, BaseScore, BaseNoteScore, TotalChords, PhrasesMissed;
+        public double Power, TotalPower, PowerTime, PowerEnd;
     }
 
     public sealed class DanceSkinData
