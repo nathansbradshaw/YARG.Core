@@ -12,7 +12,7 @@ namespace YARG.Core.Game
 {
     public partial class YargProfile
     {
-        private readonly int PROFILE_VERSION = 8;
+        private readonly int PROFILE_VERSION = 9;
 
         public int Version;
 
@@ -89,6 +89,11 @@ namespace YARG.Core.Game
         /// should remain unchanged.
         /// </summary>
         public Difficulty DifficultyFallback;
+
+        public bool KaraokeMode;
+
+        [JsonIgnore]
+        public bool IsKaraoke => GameMode == GameMode.Vocals && KaraokeMode;
 
         [JsonProperty("HarmonyIndex")]
         private byte _harmonyIndex;
@@ -276,6 +281,10 @@ namespace YARG.Core.Game
                 {
                     FiveLaneDrumsHighwayOrdering[i] = (DrumsHighwayItem) stream.ReadByte();
                 }
+            }
+            if (Version >= 9)
+            {
+                KaraokeMode = stream.ReadBoolean();
             }
         }
 
@@ -491,6 +500,7 @@ namespace YARG.Core.Game
             {
                 writer.Write((byte) item);
             }
+            writer.Write(KaraokeMode);
         }
 
         private static DrumsHighwayItem[] DEFAULT_FOUR_LANE_ORDERING = new DrumsHighwayItem[] {

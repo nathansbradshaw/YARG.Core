@@ -18,6 +18,16 @@ namespace YARG.Core.Song
 
         public override EntryType SubType => EntryType.Ini;
 
+        public override bool HasSeparateVocalAudio
+        {
+            get
+            {
+                var files = GetSubFiles();
+                return IniAudio.SupportedStems.Where(s => AudioHelpers.SupportedStems[s] == SongStem.Vocals)
+                    .Any(s => IniAudio.SupportedFormats.Any(f => files.ContainsKey(s + f)));
+            }
+        }
+
         internal override void Serialize(MemoryStream stream, CacheWriteIndices node)
         {
             stream.WriteByte((byte) _chartFormat);

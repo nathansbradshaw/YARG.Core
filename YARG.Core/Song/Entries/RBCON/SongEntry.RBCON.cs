@@ -44,6 +44,8 @@ namespace YARG.Core.Song
         protected RBMetadata _rbMetadata = RBMetadata.Default;
         protected RBIntensities _rbIntensities = RBIntensities.Default;
         protected RBAudio<int> _indices = RBAudio<int>.Empty;
+
+        public override bool HasSeparateVocalAudio => _indices.Vocals.Length > 0;
         protected RBAudio<float> _panning = RBAudio<float>.Empty;
 
         public string RBSongId => _rbMetadata.SongID;

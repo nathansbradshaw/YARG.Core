@@ -9,6 +9,34 @@ namespace YARG.Core.UnitTests.Audio;
 public class PreviewContextTests
 {
     [Test]
+    [NonParallelizable]
+    public void MutedChannelStaysSilentThroughVolumeChangesAndBypassesMinimum()
+    {
+        double savedVolume = GlobalAudioHandler.GetVolumeSetting(SongStem.Vocals);
+        try
+        {
+            using var channel = new TestStemChannel(new FakeAudioManager());
+            channel.SetMuted(true);
+            Assert.That(channel.Volume, Is.Zero);
+            GlobalAudioHandler.SetVolumeSetting(SongStem.Vocals, 0.75);
+            Assert.That(channel.Volume, Is.Zero);
+            channel.SetMuted(false);
+            Assert.That(channel.Volume, Is.EqualTo(GlobalAudioHandler.GetTrueVolume(SongStem.Vocals)));
+        }
+        finally { GlobalAudioHandler.SetVolumeSetting(SongStem.Vocals, savedVolume); }
+    }
+
+    private sealed class TestStemChannel(AudioManager manager) : StemChannel(manager, SongStem.Vocals, true)
+    {
+        public double Volume { get; private set; }
+        protected override void SetVolume_Internal(double volume) => Volume = volume;
+        protected override void SetReverb_Internal(bool reverb) { }
+        protected override void SetWhammyPitch_Internal(float percent) { }
+        protected override float GetWhammyPitch_Internal() => 0;
+        protected override void SetPosition_Internal(double position) { }
+    }
+
+    [Test]
     public async Task Create_ReturnsNullWhenDelayIsCancelledBeforeLoadingAudio()
     {
         using var cancellationTokenSource = new CancellationTokenSource();
