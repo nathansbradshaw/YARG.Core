@@ -9,6 +9,7 @@ namespace YARG.Core.Audio
         private bool _disposed;
 
         private readonly bool _clampVolume;
+        private bool _muted;
         protected readonly AudioManager _manager;
         public readonly SongStem Stem;
 
@@ -58,6 +59,16 @@ namespace YARG.Core.Audio
             }
         }
 
+        /// <summary>Mutes this channel without changing the user's volume settings.</summary>
+        public void SetMuted(bool muted)
+        {
+            lock (this)
+            {
+                _muted = muted;
+                SetVolume(GlobalAudioHandler.GetTrueVolume(Stem));
+            }
+        }
+
         private void SetVolume(double volume)
         {
             lock (this)
@@ -68,7 +79,7 @@ namespace YARG.Core.Audio
                     {
                         volume = MINIMUM_STEM_VOLUME;
                     }
-                    SetVolume_Internal(volume);
+                    SetVolume_Internal(_muted ? 0 : volume);
                 }
             }
         }

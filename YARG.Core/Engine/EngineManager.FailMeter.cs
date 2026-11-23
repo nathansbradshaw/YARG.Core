@@ -122,16 +122,21 @@ namespace YARG.Core.Engine
         private float GetAverageHappiness()
         {
             float happiness = 0.0f;
+            int count = 0;
             foreach (var engine in _allEngines)
             {
+                if (engine.ExcludeFromFailMeter) continue;
                 happiness += engine.Happiness;
+                count++;
             }
 
-            return happiness / _allEngines.Count;
+            return count == 0 ? 1.0f : happiness / count;
         }
 
         public partial class EngineContainer
         {
+            public bool ExcludeFromFailMeter { get; set; }
+
             public float Happiness { get; private set; } = 0.0f;
 
             public void ResetHappiness()

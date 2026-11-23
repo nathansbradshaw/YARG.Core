@@ -16,6 +16,24 @@ namespace YARG.Core.Song
 
         public override EntryType SubType => EntryType.Sng;
 
+        public override bool HasSeparateVocalAudio
+        {
+            get
+            {
+                using var file = SngFile.TryLoadFromFile(_location, false);
+                if (!file.IsLoaded) return false;
+                foreach (var stem in IniAudio.SupportedStems)
+                {
+                    if (AudioHelpers.SupportedStems[stem] != SongStem.Vocals) continue;
+                    foreach (var format in IniAudio.SupportedFormats)
+                    {
+                        if (file.TryGetListing(stem + format, out _)) return true;
+                    }
+                }
+                return false;
+            }
+        }
+
         internal override void Serialize(MemoryStream stream, CacheWriteIndices indices)
         {
             // Validation block

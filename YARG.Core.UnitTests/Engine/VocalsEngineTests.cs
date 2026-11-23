@@ -3,6 +3,9 @@ using YARG.Core.Chart;
 using YARG.Core.Engine;
 using YARG.Core.Engine.Vocals;
 using YARG.Core.Engine.Vocals.Engines;
+using YARG.Core.Engine.Guitar.Engines;
+using YARG.Core.Game;
+using YARG.Core.IO;
 
 namespace YARG.Core.UnitTests.Engine;
 
@@ -29,6 +32,74 @@ public sealed class VocalsEngineTests
         60.0,
         true,
         1000);
+
+    [Test]
+    public void KaraokeMissesCannotFailOrProtectTheOtherPlayers()
+    {
+        var chart = new SongChart(480);
+        var manager = new EngineManager();
+        var singer = CreateEngine(out _, out _, out _, out _);
+        var karaoke = manager.Register(singer, Instrument.Vocals, chart, RockMeterPreset.Normal);
+        karaoke.ExcludeFromFailMeter = true;
+        var guitar = new YargFiveFretGuitarEngine(
+            new InstrumentDifficulty<GuitarNote>(Instrument.FiveFretGuitar, Difficulty.Expert), chart.SyncTrack,
+            EnginePreset.Default.FiveFretGuitar.Create(StarMultiplierThresholds, SoloBonusStarMultiplierThresholds, false), false);
+        var guitarist = manager.Register(guitar, Instrument.FiveFretGuitar, chart, RockMeterPreset.Normal);
+        bool failed = false;
+        manager.OnSongFailed += () => failed = true;
+
+        for (int i = 0; i < 100; i++) singer.OnPhraseHit?.Invoke(0, false, false);
+        Assert.That(failed, Is.False);
+        Assert.That(manager.Happiness, Is.EqualTo(guitarist.Happiness));
+
+        for (int i = 0; i < 100; i++) singer.OnPhraseHit?.Invoke(1, true, false);
+        for (int i = 0; i < 200; i++) guitar.OnOverstrum?.Invoke();
+        Assert.That(failed, Is.True);
+        Assert.That(manager.Happiness, Is.EqualTo(guitarist.Happiness));
+    }
+
+    [Test]
+    public void KaraokeAloneCannotFailAndSurvivesReset()
+    {
+        var manager = new EngineManager();
+        var singer = CreateEngine(out _, out _, out _, out _);
+        var player = manager.Register(singer, Instrument.Vocals, new SongChart(480), RockMeterPreset.Normal);
+        player.ExcludeFromFailMeter = true;
+        bool failed = false;
+        manager.OnSongFailed += () => failed = true;
+
+        manager.Reset();
+        for (int i = 0; i < 100; i++) singer.OnPhraseHit?.Invoke(0, false, false);
+        Assert.That(failed, Is.False);
+        Assert.That(manager.Happiness, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void NormalSingerCanStillFail()
+    {
+        var manager = new EngineManager();
+        var singer = CreateEngine(out _, out _, out _, out _);
+        manager.Register(singer, Instrument.Vocals, new SongChart(480), RockMeterPreset.Normal);
+        bool failed = false;
+        manager.OnSongFailed += () => failed = true;
+        for (int i = 0; i < 100; i++) singer.OnPhraseHit?.Invoke(0, false, false);
+        Assert.That(failed, Is.True);
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void KaraokeSelectionRoundTripsThroughReplayProfile(bool karaoke)
+    {
+        var profile = new YargProfile { GameMode = GameMode.Vocals, KaraokeMode = karaoke };
+        using var data = new MemoryStream();
+        using (var writer = new BinaryWriter(data, System.Text.Encoding.UTF8, true)) profile.Serialize(writer);
+        data.Position = 0;
+        using var bytes = FixedArray.ReadRemainder(data);
+        var stream = new FixedArrayStream(bytes);
+        var restored = new YargProfile(ref stream);
+        Assert.That(restored.IsKaraoke, Is.EqualTo(karaoke));
+        Assert.That(stream.Position, Is.EqualTo(data.Length));
+    }
 
     [Test]
     public void GetNoteInPhraseAtSongTick_ReturnsMatchingLyric_AndSkipsPercussion()

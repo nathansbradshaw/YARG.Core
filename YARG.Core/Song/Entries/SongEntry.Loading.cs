@@ -38,6 +38,9 @@ namespace YARG.Core.Song
 
     public abstract partial class SongEntry
     {
+        /// <summary>Whether this song has separately controllable recorded vocal audio.</summary>
+        public virtual bool HasSeparateVocalAudio => false;
+
         public abstract SongChart? LoadChart();
         public abstract StemMixer? LoadAudio(float speed, double volume, params SongStem[] ignoreStems);
         public abstract StemMixer? LoadPreviewAudio(float speed);
