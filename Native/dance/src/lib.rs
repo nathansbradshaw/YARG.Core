@@ -10,6 +10,7 @@ use yace_stepmania::{
 };
 pub mod scoring;
 pub mod skin;
+mod input_calibration;
 
 pub const WINDOW: f64 = 0.180;
 const HOLD_GRACE: f64 = 0.250;
