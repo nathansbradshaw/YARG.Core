@@ -49,7 +49,7 @@ namespace YARG.Core.Audio
 
         public readonly string DisplayName;
         public bool IsMonitoring;
-        public bool IsRecordingOutput;
+        public volatile bool IsRecordingOutput;
 
         protected MicDevice(string displayName)
         {
