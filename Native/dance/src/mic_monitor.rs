@@ -2,24 +2,29 @@ use crossbeam_queue::ArrayQueue;
 use std::{
     mem::MaybeUninit,
     ptr, slice,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
 const MAX_BUFFER_MS: usize = 24;
 const PITCH_BUFFER_MS: usize = 120;
-const START_MARGIN_MS: usize = 4;
+const MAX_MARGIN_MS: usize = 4;
 
 struct MonitorQueue {
     samples: ArrayQueue<i16>,
-    start_margin: usize,
+    margin: AtomicUsize,
+    margin_step: usize,
+    max_margin: usize,
     primed: AtomicBool,
 }
 
 impl MonitorQueue {
     fn new(sample_rate: usize, buffer_ms: usize) -> Self {
+        let margin_step = sample_rate / 1000;
         Self {
             samples: ArrayQueue::new(sample_rate * buffer_ms / 1000),
-            start_margin: sample_rate * START_MARGIN_MS / 1000,
+            margin: AtomicUsize::new(margin_step),
+            margin_step,
+            max_margin: sample_rate * MAX_MARGIN_MS / 1000,
             primed: AtomicBool::new(false),
         }
     }
@@ -33,7 +38,8 @@ impl MonitorQueue {
 
     fn render(&self, output: &mut [MaybeUninit<i16>]) {
         if !self.primed.load(Ordering::Relaxed) {
-            let threshold = (output.len() + self.start_margin).min(self.samples.capacity());
+            let threshold =
+                (output.len() + self.margin.load(Ordering::Relaxed)).min(self.samples.capacity());
             if self.samples.len() < threshold {
                 output.fill(MaybeUninit::new(0));
                 return;
@@ -48,6 +54,11 @@ impl MonitorQueue {
                 }
                 None => {
                     output[index..].fill(MaybeUninit::new(0));
+                    let margin = self.margin.load(Ordering::Relaxed);
+                    self.margin.store(
+                        (margin + self.margin_step).min(self.max_margin),
+                        Ordering::Relaxed,
+                    );
                     self.primed.store(false, Ordering::Relaxed);
                     break;
                 }
@@ -187,6 +198,18 @@ mod tests {
         assert_eq!(render(&queue), [2; 4]);
         queue.clear();
         assert_eq!(render(&queue), [0; 4]);
+    }
+
+    #[test]
+    fn starts_with_one_millisecond_of_jitter_margin_and_adds_it_only_after_a_gap() {
+        let queue = MonitorQueue::new(1_000, MAX_BUFFER_MS);
+        queue.push(&[800; 5]);
+        assert_eq!(render(&queue), [800; 4]);
+        assert_eq!(render(&queue), [800, 0, 0, 0]);
+        queue.push(&[900; 5]);
+        assert_eq!(render(&queue), [0; 4]);
+        queue.push(&[900]);
+        assert_eq!(render(&queue), [900; 4]);
     }
 
     #[test]
